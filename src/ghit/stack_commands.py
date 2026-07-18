@@ -1,3 +1,4 @@
+from . import formatting as fmt
 from . import gh_graphql as ghgql
 from . import styling as s
 from . import terminal
@@ -95,7 +96,7 @@ def _print_stack_ls(ctx: Context) -> None:
         parent_prefix = parent_prefix[: max(record.depth - 1, 0)]
         top._print_line(ctx.repo, record.branch_name == checked_out, parent_prefix, record)
         if record.get_parent():
-            parent_prefix.append(top._parent_tab(record))
+            parent_prefix.append(fmt.parent_tab(record))
         top._print_gh_info(ctx.verbose, ctx.gh, parent_prefix, record)
 
 
