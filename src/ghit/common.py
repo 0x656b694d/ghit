@@ -15,7 +15,7 @@ from .args import Args
 from .error import GhitError
 from .gh import GH, init_gh
 from .gh_formatting import pr_number_with_style
-from .gitools import MyRemoteCallback, common_gitdir, get_current_branch, last_commits
+from .gitools import MyRemoteCallback, common_gitdir, get_current_branch, last_commits, resolve_base
 from .stack import Stack, open_stack
 
 
@@ -230,11 +230,22 @@ def check_record(ctx: Context, record: Stack) -> bool:
         for commit in last_commits(ctx.repo, ref.target, b):
             terminal.stdout(s.inactive(f'\t[{commit.short_id}] {commit.message.splitlines()[0]}'))
 
+    base = resolve_base(ctx.repo, record_name, parent_name)
+    if base is not None:
+        terminal.verbose(
+            s.inactive(
+                f'The commits of {record_name} start after its base [{ctx.repo[base].short_id}], '
+                'so rebase replays exactly them onto ' + parent_name + '.'
+            )
+        )
+        upstream_arg = s.emphasis(str(ctx.repo[base].short_id))
+    else:
+        upstream_arg = s.emphasis(record_name) + s.warning(f'~{b}')
     terminal.stdout(
         ' ',
         s.warning('Run `') + 'git rebase -i --onto',
         s.emphasis(parent.branch_name),
-        s.emphasis(record_name) + s.warning(f'~{b}'),
+        upstream_arg,
         s.emphasis(record_name) + s.warning('`.'),
     )
     terminal.stdout()

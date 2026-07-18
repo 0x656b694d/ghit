@@ -4,9 +4,18 @@ import pygit2 as git
 import pytest
 
 from ghit.args import Args
-from ghit.common import stack_filename
-from ghit.gitools import common_gitdir
+from ghit.branch_commands import create
+from ghit.common import ConnectionsCache, Context, check_record, stack_filename
+from ghit.gitools import common_gitdir, get_base
+from ghit.stack import parse
 from ghit.top_commands import init
+
+
+@pytest.fixture(autouse=True)
+def fresh_context():
+    ConnectionsCache._context = None
+    yield
+    ConnectionsCache._context = None
 
 
 def _make_args(repository: str) -> Args:
@@ -62,3 +71,34 @@ def test_init_creates_stack_in_gitdir(repo, tmp_path, monkeypatch):
     stack_file = Path(repo.path) / 'ghit' / 'stack'
     assert stack_file.read_text() == 'main\n'
     assert not (tmp_path / 'repo' / '.ghit').exists()
+
+
+def test_branch_create_records_base(repo, tmp_path, monkeypatch):
+    monkeypatch.delenv('GHIT_STACK', raising=False)
+    head = _commit(repo)
+
+    args = _make_args(str(tmp_path / 'repo'))
+    args.branch = 'feat'
+    create(args)
+
+    assert get_base(repo, 'feat') == head
+
+
+def test_check_record_suggests_rebase_from_base(repo, capsys):
+    author = git.Signature('test', 'test@example.com')
+    tree = repo.TreeBuilder().write()
+    a = repo.create_commit('HEAD', author, author, 'A', tree, [])
+    repo.branches.local.create('br', repo[a])
+    repo.create_commit('refs/heads/br', author, author, 'B', tree, [a])
+    repo.create_commit('refs/heads/main', author, author, 'C', tree, [a])
+
+    stack = parse(['main', '.br'])
+    ctx = Context(repo=repo, stack=stack, gh=None, args=_make_args(str(repo.workdir)))
+    record = stack.find('br')
+    assert record is not None
+
+    assert not check_record(ctx, record)
+    out = capsys.readouterr().out
+    assert 'git rebase -i --onto' in out
+    assert repo[a].short_id in out
+    assert get_base(repo, 'br') == a

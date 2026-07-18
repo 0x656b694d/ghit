@@ -1,6 +1,7 @@
 import pygit2 as git
 
 from . import styling as s
+from . import terminal
 from .args import Args
 from .common import (
     check_record,
@@ -9,7 +10,7 @@ from .common import (
     rewrite_stack,
 )
 from .error import GhitError
-from .gitools import checkout, get_current_branch
+from .gitools import checkout, get_current_branch, set_base
 
 
 def branch_submit(args: Args) -> None:
@@ -53,8 +54,18 @@ def create(args: Args) -> None:
     if head is None or not isinstance(head, git.Commit):
         raise GhitError(s.danger('HEAD is not a Commit'))
     branch = ctx.repo.branches.local.create(name=args.branch, commit=head)
+    terminal.verbose(s.inactive(f'Created branch {args.branch} at [{head.short_id}].'))
+
+    set_base(ctx.repo, args.branch, head.id)
+    terminal.verbose(
+        s.inactive(
+            f'Recorded the tip of {current.branch_name}, [{head.short_id}], as the base of {args.branch}: '
+            'restack will use it to tell the branch commits apart.'
+        )
+    )
 
     new_record = parent.add_child(args.branch)
+    terminal.verbose(s.inactive(f'Added {args.branch} to the stack under {current.branch_name}.'))
     checkout(ctx.repo, new_record)
 
     rewrite_stack(ctx)

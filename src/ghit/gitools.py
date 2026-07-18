@@ -31,6 +31,73 @@ def common_gitdir(repo: git.Repository) -> Path:
     return gitdir
 
 
+GHIT_BASE_REF_PREFIX = 'refs/ghit/base/'
+
+
+def base_ref_name(branch_name: str) -> str:
+    return GHIT_BASE_REF_PREFIX + branch_name
+
+
+def get_base(repo: git.Repository, branch_name: str) -> git.Oid | None:
+    """Return the recorded base of the branch: the parent tip its commits sit on."""
+    ref = repo.references.get(base_ref_name(branch_name))
+    return ref.target if ref else None
+
+
+def set_base(repo: git.Repository, branch_name: str, target: git.Oid) -> None:
+    repo.references.create(base_ref_name(branch_name), target, force=True)
+
+
+def _is_ancestor_or_same(repo: git.Repository, ancestor: git.Oid, descendant: git.Oid) -> bool:
+    return ancestor == descendant or repo.descendant_of(descendant, ancestor)
+
+
+def resolve_base(repo: git.Repository, branch_name: str, parent_name: str) -> git.Oid | None:
+    """Return the base of the branch, recovering and recording it when missing or stale.
+
+    The recorded base is stale when it is no longer an ancestor of the branch
+    (the branch was reset), or when the merge base with the parent is newer
+    (the branch was manually rebased onto a newer parent state).
+    """
+    branch = repo.branches.get(branch_name)
+    parent = repo.branches.get(parent_name)
+    if not branch or not parent:
+        return None
+    stored = get_base(repo, branch_name)
+    stored_valid = stored is not None and _is_ancestor_or_same(repo, stored, branch.target)
+    merge_base = repo.merge_base(parent.target, branch.target)
+    if stored_valid and (merge_base is None or not repo.descendant_of(merge_base, stored)):
+        return stored
+    if merge_base is None:
+        terminal.verbose(
+            s.inactive(f'Branches {branch_name} and {parent_name} have no common history, cannot find the base.')
+        )
+        return None
+    if stored is None:
+        terminal.verbose(
+            s.inactive(
+                f'No recorded base of {branch_name}: took the merge base with {parent_name}, '
+                f'[{repo[merge_base].short_id}].'
+            )
+        )
+    elif not stored_valid:
+        terminal.verbose(
+            s.inactive(
+                f'Recorded base of {branch_name}, [{repo[stored].short_id}], is not its ancestor anymore '
+                f'(branch reset?): took the merge base with {parent_name}, [{repo[merge_base].short_id}].'
+            )
+        )
+    else:
+        terminal.verbose(
+            s.inactive(
+                f'{branch_name} already sits on a newer state of {parent_name} (rebased manually?): '
+                f'moved its base from [{repo[stored].short_id}] to [{repo[merge_base].short_id}].'
+            )
+        )
+    set_base(repo, branch_name, merge_base)
+    return merge_base
+
+
 def get_default_branch(repo: git.Repository) -> str:
     remote_head = repo.references['refs/remotes/origin/HEAD'].resolve().shorthand
     return remote_head.removeprefix('origin/')
