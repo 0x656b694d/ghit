@@ -7,16 +7,33 @@ from . import stack_commands as scom
 from . import top_commands as top
 from .error import GhitError
 
+# Defaults for the common arguments, applied after parsing. The common parser
+# suppresses unset values so that flags given before a subcommand are not
+# overwritten by the subparser's own defaults (argparse bug bpo-9351).
+COMMON_DEFAULTS = {
+    'repository': '.',
+    'stack': None,
+    'offline': False,
+    'debug': False,
+    'verbose': False,
+}
+
 
 def create_common_parser():
     """Create a parent parser with common arguments that can appear before or after commands."""
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument('-r', '--repository', default='.', help='the git repository path (default .)')
+    common = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
+    common.add_argument('-r', '--repository', help='the git repository path (default .)')
     common.add_argument('-s', '--stack', help='the stack filename (default .git/ghit/stack)')
     common.add_argument('-o', '--offline', action='store_true', help='do not call GitHub')
     common.add_argument('-g', '--debug', action='store_true')
     common.add_argument('-v', '--verbose', action='store_true')
     return common
+
+
+def apply_common_defaults(args: argparse.Namespace) -> None:
+    for key, default in COMMON_DEFAULTS.items():
+        if not hasattr(args, key):
+            setattr(args, key, default)
 
 
 def add_top_commands(parser: argparse.ArgumentParser, common: argparse.ArgumentParser):
@@ -111,6 +128,8 @@ def ghit(argv: list[str]) -> int:
     add_branch_commands(commands.add_parser('branch', aliases=['b', 'br'], parents=[common]), common)
 
     args = parser.parse_args(args=argv)
+    apply_common_defaults(args)
+    terminal.set_verbose(args.verbose)
     if 'func' not in args:
         parser.print_usage()
         terminal.stderr('Please provide the full command, with necessary subcommands.', args)
