@@ -58,7 +58,30 @@ class Stack:
     def is_root(self) -> bool:
         return self.branch_name is None
 
-    def traverse(self, with_first_level: bool = True, ignored_disabled: bool = False) -> Iterator[Stack]:
+    def _connects(self, other: Stack) -> bool:
+        """Whether self is on the path from root to other, or in other's subtree."""
+        node: Stack | None = other
+        while node is not None:
+            if node is self:
+                return True
+            node = node.get_parent(True)
+        node = self
+        while node is not None:
+            if node is other:
+                return True
+            node = node.get_parent(True)
+        return False
+
+    def traverse(
+        self, with_first_level: bool = True, ignored_disabled: bool = False, through: Stack | None = None
+    ) -> Iterator[Stack]:
+        """Iterate the stack depth-first.
+
+        With `through`, yield only the records on the path from root to `through` and its subtree,
+        skipping sibling subtrees.
+        """
+        if through is not None and not self.is_root() and not self._connects(through):
+            return
         if (
             not self.is_root()
             and (self._enabled or ignored_disabled)
@@ -66,7 +89,7 @@ class Stack:
         ):
             yield self
         for r in self._children.values():
-            yield from r.traverse(with_first_level, ignored_disabled)
+            yield from r.traverse(with_first_level, ignored_disabled, through)
 
     def find(self, branch_name: str) -> Stack | None:
         for s in self.traverse(True, True):

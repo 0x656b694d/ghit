@@ -79,6 +79,21 @@ def _find_stack_comment(body: str) -> tuple[int, int] | None:
     return (start_index, end_index)
 
 
+def _on_current_path(record: Stack, current: Stack) -> bool:
+    """Whether record is an ancestor of current, current itself, or one of its descendants."""
+    node: Stack | None = current
+    while node is not None:
+        if node is record:
+            return True
+        node = node.get_parent(True)
+    node = record
+    while node is not None:
+        if node is current:
+            return True
+        node = node.get_parent(True)
+    return False
+
+
 def _patch_body(body: str, comment: str) -> str | None:
     range = _find_stack_comment(body)
     if range:
@@ -156,10 +171,13 @@ class GH:
             stats[pr] = GH.PRStats(nr, cr, approved, sync)
         return stats
 
-    def _make_stack_comment(self, current_pr_number: int) -> str:
+    def _make_stack_comment(self, current_pr_number: int, current_branch: str) -> str:
         md = [COMMENT_BEGIN, COMMENT_FIRST_LINE, '']
+        current = self.stack.find(current_branch)
         for record in self.stack.traverse():
             if record.branch_name is None:
+                continue
+            if current is not None and not _on_current_path(record, current):
                 continue
             prs = self.get_prs(record.branch_name)
             if prs:
@@ -203,7 +221,7 @@ class GH:
 
     def update_dependencies(self, pr: ghgql.PR) -> bool:
         logging.debug('adding dependencies to pr #%s', pr.number)
-        comment_md = self._make_stack_comment(pr.number)
+        comment_md = self._make_stack_comment(pr.number, pr.head)
         body = _patch_body(pr.body if pr.body is not None else self._fetch_body(pr), comment_md)
         if not body:
             logging.debug('dependencies are up to date')

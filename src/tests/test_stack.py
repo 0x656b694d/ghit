@@ -106,6 +106,44 @@ def test_disabled():
     assert child.get_parent() is None
 
 
+def test_traverse_through():
+    stack = parse(['main', '.br-1', '..br-2', '...br-3', '..br-4', '...br-5'])
+    br4 = stack.find('br-4')
+    assert br4 is not None
+    names = [r.branch_name for r in stack.traverse(through=br4)]
+    assert names == ['main', 'br-1', 'br-4', 'br-5']
+
+
+def test_traverse_through_leaf():
+    stack = parse(['main', '.br-1', '..br-2', '...br-3', '..br-4', '...br-5'])
+    br3 = stack.find('br-3')
+    assert br3 is not None
+    names = [r.branch_name for r in stack.traverse(through=br3)]
+    assert names == ['main', 'br-1', 'br-2', 'br-3']
+
+
+def test_traverse_through_first_level():
+    stack = parse(['main', '.br-1', '..br-2', '...br-3', '..br-4', '...br-5'])
+    main = stack.find('main')
+    assert main is not None
+    names = [r.branch_name for r in stack.traverse(through=main)]
+    assert names == ['main', 'br-1', 'br-2', 'br-3', 'br-4', 'br-5']
+
+
+def test_traverse_without_through():
+    stack = parse(['main', '.br-1', '..br-2', '...br-3', '..br-4', '...br-5'])
+    names = [r.branch_name for r in stack.traverse()]
+    assert names == ['main', 'br-1', 'br-2', 'br-3', 'br-4', 'br-5']
+
+
+def test_traverse_through_disabled_parent():
+    stack = parse(['main', '#.disabled', '..a2', '..a21', '.b1'])
+    a2 = stack.find('a2')
+    assert a2 is not None
+    names = [r.branch_name for r in stack.traverse(through=a2)]
+    assert names == ['main', 'a2']
+
+
 def test_bad_indent():
     text = ['main', '..a2']
     with pytest.raises(GhitError):
