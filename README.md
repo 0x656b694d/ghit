@@ -12,11 +12,10 @@ Features
 * Stack navigation (checkout):
   * `ghit up`, `ghit down`, `ghit top`, `ghit bottom`
 * Stack initialization with `ghit init`:
-  * creates `.ghit/stack` with the current branch as the main branch
-  * adds `.ghit/.gitignore`
+  * creates `.git/ghit/stack` with the current branch as the main branch
 * Stack manipulation: `ghit branch create <name>`:
   * create and switch to the new branch
-  * add the branch name to `.ghit/stack`
+  * add the branch name to `.git/ghit/stack`
 * Stack or branch publication with `ghit stack submit` or `ghit branch submit`:
   * pushes branch(es) upstream with no force, so may fail after rebase
   * creates or updates GitHub PR(s)
@@ -38,7 +37,7 @@ Example Flow
 
 ```console
 localhost:my-git-repo (main)$ ghit init
-localhost:my-git-repo (main)$ cat .ghit/stack 
+localhost:my-git-repo (main)$ cat .git/ghit/stack 
 main
 ```
 
@@ -46,7 +45,7 @@ main
 localhost:my-git-repo (main)$ ghit branch create new-feature
 Checked-out new-feature.
 The branch doesn't have an upstream.
-localhost:my-git-repo (new-feature)$ cat .ghit/stack 
+localhost:my-git-repo (new-feature)$ cat .git/ghit/stack 
 main
 .new-feature
 ```

@@ -15,7 +15,7 @@ from .args import Args
 from .error import GhitError
 from .gh import GH, init_gh
 from .gh_formatting import pr_number_with_style
-from .gitools import MyRemoteCallback, get_current_branch, last_commits
+from .gitools import MyRemoteCallback, common_gitdir, get_current_branch, last_commits
 from .stack import Stack, open_stack
 
 
@@ -45,13 +45,13 @@ class ConnectionsCache:
     _context: Context | None = None
 
 
-GHIT_STACK_DIR = '.ghit'
+GHIT_DIR = 'ghit'
 GHIT_STACK_FILENAME = 'stack'
 
 
 def stack_filename(repo: git.Repository) -> Path:
     env = os.getenv('GHIT_STACK')
-    return Path(env) if env else Path(repo.path).resolve().parent / GHIT_STACK_DIR / GHIT_STACK_FILENAME
+    return Path(env) if env else common_gitdir(repo) / GHIT_DIR / GHIT_STACK_FILENAME
 
 
 def connect(args: Args) -> Context:
@@ -164,6 +164,7 @@ def push_and_pr(
 
 def rewrite_stack(ctx: Context) -> None:
     filename = Path(ctx.args.stack) if ctx.args.stack else stack_filename(ctx.repo)
+    filename.parent.mkdir(parents=True, exist_ok=True)
     with filename.open('w') as ghit_stack:
         ghit_stack.write('\n'.join(ctx.stack.dumps()) + '\n')
 

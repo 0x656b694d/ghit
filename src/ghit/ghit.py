@@ -12,7 +12,7 @@ def create_common_parser():
     """Create a parent parser with common arguments that can appear before or after commands."""
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument('-r', '--repository', default='.', help='the git repository path (default .)')
-    common.add_argument('-s', '--stack', help='the stack filename (default .ghit/stack)')
+    common.add_argument('-s', '--stack', help='the stack filename (default .git/ghit/stack)')
     common.add_argument('-o', '--offline', action='store_true', help='do not call GitHub')
     common.add_argument('-g', '--debug', action='store_true')
     common.add_argument('-v', '--verbose', action='store_true')
@@ -24,7 +24,7 @@ def add_top_commands(parser: argparse.ArgumentParser, common: argparse.ArgumentP
 
     commands.add_parser(
         'init',
-        help='create `.ghit/stack` file with the current branch',
+        help='create the stack file with the current branch',
         parents=[common],
     ).set_defaults(func=top.init)
 

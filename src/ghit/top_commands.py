@@ -1,6 +1,5 @@
 import logging
 import os
-from pathlib import Path
 
 import pygit2 as git
 
@@ -9,7 +8,7 @@ from . import styling as s
 from . import terminal
 from .__init__ import __version__
 from .args import Args
-from .common import GHIT_STACK_DIR, connect, stack_filename
+from .common import connect, stack_filename
 from .error import GhitError
 from .gh import GH
 from .gh_formatting import format_info
@@ -186,24 +185,13 @@ def init(args: Args) -> None:
     if args.stack or os.getenv('GHIT_STACK'):
         raise GhitError
     repo = git.Repository(args.repository)
-    repopath = Path(repo.workdir).resolve()
     filename = stack_filename(repo)
     logging.debug('stack filename: %s', filename)
-    logging.debug('stack arg: %s', args.stack)
 
-    stack = open_stack(Path(args.stack) if args.stack else filename)
+    stack = open_stack(filename)
     if stack:
         return
-    logging.debug('%s vs %s', filename, repopath)
-    if os.path.commonpath([filename, repopath]) == str(repopath):
-        dotghit = Path(repopath / GHIT_STACK_DIR)
-        logging.debug('creating dir %s', dotghit)
-
-        dotghit.mkdir(exist_ok=True)
-        if not repo.path_is_ignored(str(filename)):
-            with (dotghit / '.gitignore').open('w') as gitignore:
-                gitignore.write('*\n')
-
+    filename.parent.mkdir(parents=True, exist_ok=True)
     with filename.open('w') as ghitstack:
         branch_name = repo.config['init.defaultBranch'] if repo.is_empty else get_current_branch(repo).branch_name
         ghitstack.write(branch_name + '\n')

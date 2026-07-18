@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import pygit2 as git
 
@@ -19,6 +20,15 @@ class MyRemoteCallback(git.RemoteCallbacks):
     def push_update_reference(self, refname, message):
         self.message = message
         self.refname = refname
+
+
+def common_gitdir(repo: git.Repository) -> Path:
+    """Resolve the git directory shared by all worktrees of the repository."""
+    gitdir = Path(repo.path)
+    commondir = gitdir / 'commondir'
+    if commondir.is_file():
+        return (gitdir / commondir.read_text().strip()).resolve()
+    return gitdir
 
 
 def get_default_branch(repo: git.Repository) -> str:
