@@ -109,6 +109,32 @@ def push_branch(origin: git.Remote, branch: git.Branch):
     )
 
 
+def _update_prs(gh: GH, record: Stack, prs: list[ghgql.PR]) -> None:
+    for pr in prs:
+        logging.debug('found pr: %d closed=%s merged=%s', pr.number, pr.closed, pr.merged)
+        if gh.update_dependencies(pr):
+            terminal.stdout(f'Updated dependencies in {pr_number_with_style(pr)}.')
+
+        if pr.closed or pr.merged:
+            continue
+        if gh.update_pr(record, pr):
+            terminal.stdout(f'Set PR {pr_number_with_style(pr)} base branch to {s.emphasis(pr.base)}.')
+
+
+def _create_pr(gh: GH, record: Stack, title: str, draft: bool) -> ghgql.PR:
+    parent = record.get_parent()
+    if parent is None or parent.branch_name is None:
+        raise GhitError(s.danger('No parent branch to base PR on'))
+    pr = gh.create_pr(parent.branch_name, record.branch_name, title, draft)
+    terminal.stdout(
+        'Created draft PR ' if draft else 'Created PR ',
+        pr_number_with_style(pr),
+        '.',
+        sep='',
+    )
+    return pr
+
+
 def push_and_pr(
     ctx: Context,
     origin: git.Remote,
@@ -131,30 +157,9 @@ def push_and_pr(
 
     prs = ctx.gh.get_prs(record.branch_name)
     if prs:
-        for pr in prs:
-            logging.debug('found pr: %d closed=%s merged=%s', pr.number, pr.closed, pr.merged)
-            if ctx.gh.update_dependencies(pr):
-                terminal.stdout(f'Updated dependencies in {pr_number_with_style(pr)}.')
-
-            if pr.closed or pr.merged:
-                continue
-            if ctx.gh.update_pr(record, pr):
-                terminal.stdout(f'Set PR {pr_number_with_style(pr)} base branch to {s.emphasis(pr.base)}.')
-
-    else:
-        parent = record.get_parent()
-        if parent is None or parent.branch_name is None:
-            raise GhitError(s.danger('No parent branch to base PR on'))
-        pr = ctx.gh.create_pr(parent.branch_name, record.branch_name, title, draft)
-        terminal.stdout(
-            'Created draft PR ' if draft else 'Created PR ',
-            pr_number_with_style(pr),
-            '.',
-            sep='',
-        )
-        prs.append(pr)
-        return prs, True
-    return prs, False
+        _update_prs(ctx.gh, record, prs)
+        return prs, False
+    return [_create_pr(ctx.gh, record, title, draft)], True
 
 
 def rewrite_stack(ctx: Context) -> None:
